@@ -12,6 +12,10 @@ from envs_lab2.dc_env import dc_gymenv
 file_path = os.path.abspath(__file__)
 PATH = os.path.dirname(file_path)
 
+# Keep training resets separate from the 36 evaluation days used by the scripts.
+TEST_DAY_IDS = range(0, 360, 10)
+TRAIN_DAY_IDS = tuple(day for day in range(365) if day not in TEST_DAY_IDS)
+
 print(f"PATH: {PATH}")
 
 def sc_time(step_id):
@@ -33,7 +37,8 @@ class DCRL(gym.Env):
 
         carbon_data_list = pd.read_csv(PATH+f"/data/CarbonIntensity/uk_data.csv")['CARBON_INTENSITY'].values[:8760]
         self.carbon_data = carbon_data_list.reshape(365,24).astype(float)
-        self.carbon_data_norm = 2*self.carbon_data  / self.carbon_data.max() 
+        self.carbon_data_norm = 2*self.carbon_data / self.carbon_data[list(TRAIN_DAY_IDS)].max()
+
 
         # Adding a time dimension to the observation space
         low_time = np.array([0.0, 0.0], dtype=np.float32)
@@ -50,7 +55,7 @@ class DCRL(gym.Env):
         
         high = np.concatenate([
             high_time,
-            2*np.ones(24, dtype=np.float32),
+            np.full(24, np.inf, dtype=np.float32),
             self.workload_env.observation_space.high.astype(np.float32),
             self.dc_env.observation_space.high.astype(np.float32),
             self.battery_env.observation_space.high.astype(np.float32)
@@ -94,7 +99,7 @@ class DCRL(gym.Env):
             # 可根据需要为其他子环境设置 seed
 
         if day_id is None:
-            self.day_id = np.random.randint(0,365)
+            self.day_id = int(np.random.choice(TRAIN_DAY_IDS))
         else:
             self.day_id = day_id
         self.carbon_data_day = self.carbon_data[self.day_id]
